@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Mutatiom — browser-native simulator and visualizer for quantum proton tunnelling in DNA base pairs (Löwdin point-mutation mechanism).",
+  "license": "MIT",
+  "author": "Andre Paquette",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
