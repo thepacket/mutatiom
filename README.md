@@ -36,6 +36,18 @@ npm run typecheck
 npm run build
 ```
 
+## Methods, validation & scope
+
+See **[docs/METHODS.md](docs/METHODS.md)** for the full model description,
+parameter provenance, a literature-validation table (machine-checked in
+`test/validation.test.ts`), and an explicit limitations + scope statement.
+Short version: Mutatiom is an **educational / reduced-model** tool grounded in
+published quantum chemistry — not a from-first-principles mutation-rate
+predictor. It reproduces the known G·C≫A·T mutational bias, ~10⁻⁷ tautomer
+fractions, the tunnelling kinetic-isotope-effect signature, and sub-nanosecond
+relaxation; it does **not** reproduce the published zero-point energy (the
+single quartic over-constrains the well curvature — see Limitations).
+
 ## Data provenance
 
 The A·T and G·C base-pair double wells are **derived from published
