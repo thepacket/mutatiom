@@ -8,6 +8,7 @@ import { tunnelingFromSpectrum, tautomerFraction } from "./sim/tunneling";
 import { prepareLeftLocalised, densityAt } from "./sim/evolve";
 import { PAIR_PRESETS, pairFor, type Base } from "./sim/dna";
 import { DnaPanel } from "./DnaPanel";
+import { LindbladPanel } from "./LindbladPanel";
 import {
   PROTON_MASS,
   DEUTERON_MASS,
@@ -224,6 +225,8 @@ export function App() {
           </div>
         </section>
       </div>
+
+      <LindbladPanel solved={solved} tempK={tempK} />
     </div>
   );
 }
