@@ -45,6 +45,23 @@ describe("double well + tunnelling", () => {
     expect(ratio).toBeLessThan(3);
   });
 
+  it("uses FD splitting for symmetric wells, WKB element for biased wells", () => {
+    // Symmetric: E₁−E₀ is the tunnelling splitting and tracks WKB → trust FD.
+    const sym = tunnelingFromSpectrum(
+      solveDoubleWell({ ...DEFAULT_PARAMS, bias: 0 }),
+    );
+    expect(sym.reliableFD).toBe(true);
+    expect(sym.splittingEffective).toBe(sym.splitting);
+
+    // Biased: E₁−E₀ is the detuning (≫ the tunnelling element) → fall back to WKB.
+    const biased = tunnelingFromSpectrum(
+      solveDoubleWell({ ...DEFAULT_PARAMS, bias: 0.005 }),
+    );
+    expect(biased.reliableFD).toBe(false);
+    expect(biased.splittingEffective).toBe(biased.splittingWKB);
+    expect(biased.splittingEffective).toBeLessThan(biased.splitting);
+  });
+
   it("tautomer fraction rises with temperature for a biased well", () => {
     const cold = tautomerFraction(DEFAULT_PARAMS, 100);
     const warm = tautomerFraction(DEFAULT_PARAMS, 310);

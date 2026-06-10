@@ -12,17 +12,31 @@ import type { ProtonParams, SolveResult } from "./doubleWell";
 import { potential } from "./doubleWell";
 
 export interface TunnelingResult {
-  /** Exact ground tunnelling splitting Δ = E₁ − E₀ (Hartree). */
+  /** Raw finite-difference ground splitting Δ = E₁ − E₀ (Hartree). */
   splitting: number;
   /** WKB semiclassical estimate of the same splitting (Hartree). */
   splittingWKB: number;
-  /** Coherent transfer time π/Δ (seconds). */
+  /**
+   * Best splitting estimate (Hartree). Equals the finite-difference value in
+   * the resolvable regime; falls back to WKB in the deep-tunnelling regime,
+   * where the FD splitting is below numerical resolution and floors out.
+   */
+  splittingEffective: number;
+  /** False when the FD splitting is unresolvable and WKB is used instead. */
+  reliableFD: boolean;
+  /** Coherent transfer time π/Δ from the effective splitting (seconds). */
   transferTimeSeconds: number;
   /** Small-oscillation frequency in a well, ω (atomic units). */
   wellOmega: number;
   /** WKB barrier action θ = ∫√(2m(V−E)) dx (dimensionless, atomic units). */
   barrierAction: number;
 }
+
+// For a near-symmetric well E₁−E₀ IS the tunnelling splitting and tracks WKB
+// closely. For a biased well it is instead the canonical↔tautomer *detuning*
+// (≈ the bias), far larger than the tunnelling matrix element — so when FD
+// exceeds WKB by more than this factor we report the WKB element instead.
+const FD_WKB_MAX_RATIO = 5;
 
 /** Curvature of V at its (left) minimum → harmonic ω = √(V''/m). */
 function wellFrequency(p: ProtonParams): number {
@@ -34,23 +48,26 @@ function wellFrequency(p: ProtonParams): number {
 
 /**
  * WKB action under the *central* barrier at energy E (numerical integral).
- * Only the connected classically-forbidden interval containing x = 0 counts —
- * the outer quartic walls are confining, not the tunnelling barrier.
+ *
+ * Only the inter-minima region [−a, +a] (a = wellSep) is integrated: the outer
+ * quartic walls are confining, not the tunnelling barrier, and — for a biased
+ * well where the shallow (tautomer) minimum sits above E — we must not let the
+ * forbidden region run across that whole second well, which would wildly
+ * over-count the action. The barrier between the two wells is what governs the
+ * canonical→tautomer transfer.
  */
 function wkbAction(p: ProtonParams, E: number, dx: number): number {
   // If the energy already sits above the barrier top, there is no barrier.
   if (potential(0, p) <= E) return 0;
   let theta = 0;
-  // Integrate outward from the origin until V drops below E (a turning point).
-  for (let x = 0; x <= p.halfWidth; x += dx) {
+  const a = p.wellSep;
+  for (let x = 0; x <= a; x += dx) {
     const gap = potential(x, p) - E;
-    if (gap <= 0) break;
-    theta += Math.sqrt(2 * p.mass * gap) * dx;
+    if (gap > 0) theta += Math.sqrt(2 * p.mass * gap) * dx;
   }
-  for (let x = -dx; x >= -p.halfWidth; x -= dx) {
+  for (let x = -dx; x >= -a; x -= dx) {
     const gap = potential(x, p) - E;
-    if (gap <= 0) break;
-    theta += Math.sqrt(2 * p.mass * gap) * dx;
+    if (gap > 0) theta += Math.sqrt(2 * p.mass * gap) * dx;
   }
   return theta;
 }
@@ -67,12 +84,21 @@ export function tunnelingFromSpectrum(res: SolveResult): TunnelingResult {
   // Standard double-well WKB splitting: Δ ≈ (ħω/π)·e^{−θ}.
   const splittingWKB = (omega / Math.PI) * Math.exp(-theta);
 
+  // Near-symmetric: FD ≈ WKB and FD is the true splitting. Biased: FD is the
+  // detuning, so fall back to the WKB tunnelling matrix element.
+  const reliableFD = splittingWKB > 0 && splitting <= splittingWKB * FD_WKB_MAX_RATIO;
+  const splittingEffective = reliableFD ? splitting : splittingWKB;
+
   const transferTimeSeconds =
-    splitting > 0 ? (Math.PI / splitting) * ATOMIC_TIME_TO_SECONDS : Infinity;
+    splittingEffective > 0
+      ? (Math.PI / splittingEffective) * ATOMIC_TIME_TO_SECONDS
+      : Infinity;
 
   return {
     splitting,
     splittingWKB,
+    splittingEffective,
+    reliableFD,
     transferTimeSeconds,
     wellOmega: omega,
     barrierAction: theta,

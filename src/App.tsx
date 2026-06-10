@@ -6,6 +6,8 @@ import {
 } from "./sim/doubleWell";
 import { tunnelingFromSpectrum, tautomerFraction } from "./sim/tunneling";
 import { prepareLeftLocalised, densityAt } from "./sim/evolve";
+import { PAIR_PRESETS, pairFor, type Base } from "./sim/dna";
+import { DnaPanel } from "./DnaPanel";
 import {
   PROTON_MASS,
   DEUTERON_MASS,
@@ -23,12 +25,21 @@ export function App() {
   const [tempK, setTempK] = useState(310);
   const [playing, setPlaying] = useState(true);
   const [tAtomic, setTAtomic] = useState(0);
+  const [selectedBase, setSelectedBase] = useState<number | null>(null);
+  const [pairLabel, setPairLabel] = useState<string | null>(null);
+
+  const pickBase = (base: Base) => {
+    const preset = PAIR_PRESETS[pairFor(base)];
+    setParams((p) => ({ ...preset.params, mass: p.mass }));
+    setPairLabel(preset.label);
+  };
 
   const solved = useMemo(() => solveDoubleWell(params, 6), [params]);
   const tun = useMemo(() => tunnelingFromSpectrum(solved), [solved]);
   const wp = useMemo(() => prepareLeftLocalised(solved, 8), [solved]);
 
-  const period = tun.splitting > 0 ? (2 * Math.PI) / tun.splitting : Infinity;
+  const period =
+    tun.splittingEffective > 0 ? (2 * Math.PI) / tun.splittingEffective : Infinity;
 
   // Animation: map ~6 s of wall clock to one tunnelling period.
   const raf = useRef<number>(0);
@@ -87,6 +98,13 @@ export function App() {
           tautomer minimum — the Löwdin route to a spontaneous point mutation.
         </p>
       </header>
+
+      <DnaPanel
+        tempK={tempK}
+        onPickBase={pickBase}
+        selected={selectedBase}
+        onSelect={setSelectedBase}
+      />
 
       <div className="main">
         <aside className="controls">
@@ -154,6 +172,14 @@ export function App() {
         </aside>
 
         <section className="stage">
+          <div className="stage-head">
+            Proton double well{" "}
+            {pairLabel ? (
+              <span className="pairbadge">{pairLabel} base pair</span>
+            ) : (
+              <span className="pairbadge custom">custom parameters</span>
+            )}
+          </div>
           <svg viewBox={`0 0 ${W} ${H}`} className="plot">
             {/* baseline */}
             <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} className="axis" />
@@ -190,8 +216,8 @@ export function App() {
           </svg>
 
           <div className="readout">
-            <Stat label="Tunnelling splitting Δ" value={`${(tun.splitting * HARTREE_TO_KCAL * 349.75).toExponential(2)} cm⁻¹`} hint="E₁ − E₀" />
-            <Stat label="Transfer time (½ period)" value={fmtTime(transferFs)} hint="canonical → tautomer" />
+            <Stat label="Tunnelling splitting Δ" value={`${(tun.splittingEffective * HARTREE_TO_KCAL * 349.75).toExponential(2)} cm⁻¹`} hint={tun.reliableFD ? "E₁ − E₀" : "WKB (FD unresolvable)"} />
+            <Stat label="Transfer time (½ period)" value={fmtTime(transferFs)} hint={tun.reliableFD ? "canonical → tautomer" : "WKB estimate"} />
             <Stat label="WKB barrier action θ" value={tun.barrierAction.toFixed(2)} hint="∫√(2m(V−E))dx" />
             <Stat label="Tautomer fraction" value={fmtPct(tautFrac)} hint={`Boltzmann @ ${tempK} K`} />
             <Stat label="clock" value={`t = ${tNowFs.toFixed(0)} fs`} hint="animation time" />
