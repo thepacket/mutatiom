@@ -16,13 +16,28 @@ export interface FetchedSequence {
 }
 
 async function getJSON(path: string): Promise<unknown> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!res.ok) {
-    throw new Error(`Ensembl ${res.status}: ${await res.text().catch(() => res.statusText)}`);
+  // `Accept` (not `Content-Type`) requests JSON without tripping a CORS
+  // preflight on a cross-origin GET. A timeout guarantees the promise settles
+  // so the caller's UI never gets stuck "loading".
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { Accept: "application/json" },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Ensembl ${res.status}: ${await res.text().catch(() => res.statusText)}`);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("Ensembl request timed out");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 /** Fetch the coding sequence (CDS) for a stable Ensembl ID. */
