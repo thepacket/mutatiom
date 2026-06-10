@@ -134,52 +134,45 @@ export function relaxationTimeFs(res: SolveResult, tempK: number, sd: SpectralDe
   return R > 0 ? (1 / R) * ATOMIC_TIME_TO_SECONDS * 1e15 : Infinity;
 }
 
-interface CMat {
-  re: number[][];
-  im: number[][];
-}
-
-function rhs(rho: CMat, E: number[], rates: number[][], M: number): CMat {
-  const dre = Array.from({ length: M }, () => new Array<number>(M).fill(0));
-  const dim = Array.from({ length: M }, () => new Array<number>(M).fill(0));
-
+// dρ/dt into (dre,dim), all flat M×M Float64Arrays (idx = a*M+b). Reads only
+// (re,im); writes only the output buffers — no per-step allocation.
+function rhsFlat(
+  re: Float64Array,
+  im: Float64Array,
+  dre: Float64Array,
+  dim: Float64Array,
+  E: number[],
+  rates: number[][],
+  M: number,
+): void {
+  dre.fill(0);
+  dim.fill(0);
   // Coherent part: −i[H,ρ]_{ab} = −i(E_a − E_b) ρ_{ab}.
   for (let a = 0; a < M; a++) {
     for (let b = 0; b < M; b++) {
+      const idx = a * M + b;
       const w = E[a] - E[b];
-      // −i·w·(re + i·im) = w·im − i·w·re
-      dre[a][b] += w * rho.im[a][b];
-      dim[a][b] += -w * rho.re[a][b];
+      dre[idx] += w * im[idx];
+      dim[idx] += -w * re[idx];
     }
   }
-
-  // Dissipator: for each i→j with rate r, population flows i→j and every
-  // coherence touching i is damped at r/2.
+  // Dissipator: gain ρ_ii → ρ_jj at rate r; coherences touching i damped at r/2.
   for (let i = 0; i < M; i++) {
+    const rii = re[i * M + i];
     for (let j = 0; j < M; j++) {
+      if (i === j) continue;
       const r = rates[i][j];
-      if (r === 0 || i === j) continue;
-      dre[j][j] += r * rho.re[i][i]; // gain: ρ_ii → ρ_jj
+      if (r === 0) continue;
+      dre[j * M + j] += r * rii;
+      const hr = 0.5 * r;
       for (let b = 0; b < M; b++) {
-        dre[i][b] -= 0.5 * r * rho.re[i][b];
-        dim[i][b] -= 0.5 * r * rho.im[i][b];
-        dre[b][i] -= 0.5 * r * rho.re[b][i];
-        dim[b][i] -= 0.5 * r * rho.im[b][i];
+        dre[i * M + b] -= hr * re[i * M + b];
+        dim[i * M + b] -= hr * im[i * M + b];
+        dre[b * M + i] -= hr * re[b * M + i];
+        dim[b * M + i] -= hr * im[b * M + i];
       }
     }
   }
-  return { re: dre, im: dim };
-}
-
-function axpy(y: CMat, a: number, x: CMat, M: number): CMat {
-  const re = Array.from({ length: M }, () => new Array<number>(M).fill(0));
-  const im = Array.from({ length: M }, () => new Array<number>(M).fill(0));
-  for (let p = 0; p < M; p++)
-    for (let q = 0; q < M; q++) {
-      re[p][q] = y.re[p][q] + a * x.re[p][q];
-      im[p][q] = y.im[p][q] + a * x.im[p][q];
-    }
-  return { re, im };
 }
 
 export interface LindbladTrajectory {
@@ -199,10 +192,10 @@ export interface LindbladOptions {
   samples?: number;
 }
 
-function rightPop(rho: CMat, projRight: number[][], M: number): number {
+function rightPopFlat(re: Float64Array, projRight: number[][], M: number): number {
   let p = 0;
   for (let a = 0; a < M; a++)
-    for (let b = 0; b < M; b++) p += rho.re[a][b] * projRight[a][b];
+    for (let b = 0; b < M; b++) p += re[a * M + b] * projRight[a][b];
   return p;
 }
 
@@ -228,13 +221,27 @@ export function evolveLindblad(res: SolveResult, opts: LindbladOptions): Lindbla
   let maxR = 0;
   for (let i = 0; i < M; i++) for (let j = 0; j < M; j++) maxR = Math.max(maxR, rates[i][j]);
   const dt = Math.min((2 * Math.PI) / maxW / 40, maxR > 0 ? 0.1 / maxR : Infinity, tMaxAtomic / 500);
-  const stepsPerSample = Math.max(1, Math.ceil(tMaxAtomic / samples / dt));
 
-  // Initial ρ = |ψ_L⟩⟨ψ_L|.
-  let rho: CMat = {
-    re: Array.from({ length: M }, (_, a) => Array.from({ length: M }, (_, b) => c0[a] * c0[b])),
-    im: Array.from({ length: M }, () => new Array<number>(M).fill(0)),
-  };
+  // Hard cap on integration steps so a very slow bath (e.g. the heavily
+  // suppressed deuteron tunnelling) can't blow the step count up and freeze the
+  // main thread. When the full 6·τ window would exceed the cap we truncate the
+  // simulated time; the relaxation-time and steady-state readouts are computed
+  // analytically from the rates, so the panel stays correct regardless.
+  const MAX_STEPS = 50000;
+  let totalSteps = Math.ceil(tMaxAtomic / dt);
+  if (totalSteps > MAX_STEPS) totalSteps = MAX_STEPS;
+  const stepsPerSample = Math.max(1, Math.floor(totalSteps / samples));
+
+  // Initial ρ = |ψ_L⟩⟨ψ_L| (flat M×M); all scratch buffers preallocated.
+  const D = M * M;
+  const rre = new Float64Array(D);
+  const rim = new Float64Array(D);
+  for (let a = 0; a < M; a++) for (let b = 0; b < M; b++) rre[a * M + b] = c0[a] * c0[b];
+  const k1r = new Float64Array(D), k1i = new Float64Array(D);
+  const k2r = new Float64Array(D), k2i = new Float64Array(D);
+  const k3r = new Float64Array(D), k3i = new Float64Array(D);
+  const k4r = new Float64Array(D), k4i = new Float64Array(D);
+  const tr = new Float64Array(D), ti = new Float64Array(D);
 
   const timesFs: number[] = [];
   const popRight: number[] = [];
@@ -245,26 +252,29 @@ export function evolveLindblad(res: SolveResult, opts: LindbladOptions): Lindbla
   let t = 0;
   const record = () => {
     timesFs.push(t * toFs);
-    const pr = rightPop(rho, projRight, M);
+    const pr = rightPopFlat(rre, projRight, M);
     popRight.push(pr);
     popCanonical.push(1 - pr);
-    levels.push(Array.from({ length: M }, (_, k) => rho.re[k][k]));
+    levels.push(Array.from({ length: M }, (_, k) => rre[k * M + k]));
   };
   record();
 
+  const h = dt;
   for (let s = 0; s < samples; s++) {
-    for (let k = 0; k < stepsPerSample; k++) {
-      // RK4
-      const k1 = rhs(rho, E, rates, M);
-      const k2 = rhs(axpy(rho, dt / 2, k1, M), E, rates, M);
-      const k3 = rhs(axpy(rho, dt / 2, k2, M), E, rates, M);
-      const k4 = rhs(axpy(rho, dt, k3, M), E, rates, M);
-      let next = axpy(rho, dt / 6, k1, M);
-      next = axpy(next, dt / 3, k2, M);
-      next = axpy(next, dt / 3, k3, M);
-      next = axpy(next, dt / 6, k4, M);
-      rho = next;
-      t += dt;
+    for (let step = 0; step < stepsPerSample; step++) {
+      rhsFlat(rre, rim, k1r, k1i, E, rates, M);
+      for (let k = 0; k < D; k++) { tr[k] = rre[k] + 0.5 * h * k1r[k]; ti[k] = rim[k] + 0.5 * h * k1i[k]; }
+      rhsFlat(tr, ti, k2r, k2i, E, rates, M);
+      for (let k = 0; k < D; k++) { tr[k] = rre[k] + 0.5 * h * k2r[k]; ti[k] = rim[k] + 0.5 * h * k2i[k]; }
+      rhsFlat(tr, ti, k3r, k3i, E, rates, M);
+      for (let k = 0; k < D; k++) { tr[k] = rre[k] + h * k3r[k]; ti[k] = rim[k] + h * k3i[k]; }
+      rhsFlat(tr, ti, k4r, k4i, E, rates, M);
+      const h6 = h / 6;
+      for (let k = 0; k < D; k++) {
+        rre[k] += h6 * (k1r[k] + 2 * k2r[k] + 2 * k3r[k] + k4r[k]);
+        rim[k] += h6 * (k1i[k] + 2 * k2i[k] + 2 * k3i[k] + k4i[k]);
+      }
+      t += h;
     }
     record();
   }

@@ -26,7 +26,14 @@ function fmtKie(k: number): string {
 }
 
 export function IsotopePanel({ params }: { params: ProtonParams }) {
-  const data = useMemo(() => isotopeComparison(params), [params]);
+  // The KIE always sweeps ¹H/²H/³H, so it's independent of the selected
+  // particle (params.mass) — depend only on the well shape to avoid a needless
+  // 3-well resolve when the proton/deuteron toggle flips.
+  const data = useMemo(
+    () => isotopeComparison(params),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [params.barrier, params.wellSep, params.bias, params.halfWidth, params.gridN],
+  );
 
   const maxKie = Math.max(10, ...data.map((d) => (Number.isFinite(d.kie) ? d.kie : 0)));
   const logMax = Math.log10(maxKie);
