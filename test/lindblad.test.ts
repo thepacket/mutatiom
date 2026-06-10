@@ -6,6 +6,7 @@ import {
   buildRates,
   thermalPopulations,
   evolveLindblad,
+  relaxationTimeFs,
 } from "../src/sim/lindblad";
 import { BOLTZMANN_HARTREE_PER_K } from "../src/sim/constants";
 
@@ -67,5 +68,13 @@ describe("Lindblad open-system engine", () => {
     const traj = evolveLindblad(res, { tempK: 310, coupling: 0.2, samples: 40 });
     expect(traj.relaxTimeFs).toBeGreaterThan(0);
     expect(Number.isFinite(traj.relaxTimeFs)).toBe(true);
+  });
+
+  it("relaxationTimeFs matches the evolved trajectory's value and scales with κ", () => {
+    const direct = relaxationTimeFs(res, 310, 0.2);
+    const traj = evolveLindblad(res, { tempK: 310, coupling: 0.2, samples: 20 });
+    expect(direct).toBeCloseTo(traj.relaxTimeFs, 3);
+    // Stronger coupling ⇒ faster relaxation (shorter time), τ ∝ 1/κ.
+    expect(relaxationTimeFs(res, 310, 0.4)).toBeLessThan(direct);
   });
 });

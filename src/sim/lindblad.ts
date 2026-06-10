@@ -100,6 +100,19 @@ export function thermalPopulations(E: number[], kT: number): number[] {
   return w.map((v) => v / z);
 }
 
+/**
+ * Relaxation time of the lowest (canonical↔tautomer) pair, 1/(r₀₁+r₁₀), in
+ * femtoseconds — without time-stepping. This is the timescale on which the
+ * open system reaches its thermal tautomer population.
+ */
+export function relaxationTimeFs(res: SolveResult, tempK: number, coupling: number): number {
+  const sys = buildSystem(res, 4);
+  const kT = BOLTZMANN_HARTREE_PER_K * tempK;
+  const rates = buildRates(sys, kT, coupling);
+  const R = (rates[0]?.[1] ?? 0) + (rates[1]?.[0] ?? 0);
+  return R > 0 ? (1 / R) * ATOMIC_TIME_TO_SECONDS * 1e15 : Infinity;
+}
+
 interface CMat {
   re: number[][];
   im: number[][];

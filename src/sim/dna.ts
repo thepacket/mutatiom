@@ -14,8 +14,10 @@
 // and respond to temperature, which is the legible physics this tool is for.
 
 import type { ProtonParams } from "./doubleWell";
+import { solveDoubleWell } from "./doubleWell";
 import { PROTON_MASS } from "./constants";
 import { tautomerFraction } from "./tunneling";
+import { relaxationTimeFs } from "./lindblad";
 
 export type Base = "A" | "C" | "G" | "T";
 export type PairType = "AT" | "TA" | "GC" | "CG";
@@ -110,6 +112,20 @@ export function analyzeSequence(raw: string, tempK: number): SequenceAnalysis {
     gcContent: bases.length ? gc / bases.length : 0,
     cpgSites,
   };
+}
+
+/**
+ * Open-system relaxation time (fs) for each pair type at temperature T and
+ * bath coupling κ. Only two distinct presets (A·T, G·C) exist, so the double
+ * well is solved at most twice — cheap enough to call per render.
+ */
+export function pairRelaxationTimesFs(
+  tempK: number,
+  coupling: number,
+): Record<PairType, number> {
+  const gc = relaxationTimeFs(solveDoubleWell(GC_PARAMS), tempK, coupling);
+  const at = relaxationTimeFs(solveDoubleWell(AT_PARAMS), tempK, coupling);
+  return { GC: gc, CG: gc, AT: at, TA: at };
 }
 
 /** Centred sliding-window mean of a per-position series (regional smoothing). */

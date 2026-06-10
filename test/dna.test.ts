@@ -5,6 +5,7 @@ import {
   susceptibilityAt,
   analyzeSequence,
   windowMean,
+  pairRelaxationTimesFs,
   COMPLEMENT,
 } from "../src/sim/dna";
 
@@ -44,6 +45,17 @@ describe("DNA layer", () => {
     // CpG = a C immediately followed by G: only position 1 in "GCGCAT".
     expect(a.cpgSites).toEqual([1]);
     expect(a.susceptibility.length).toBe(6);
+  });
+
+  it("pairRelaxationTimesFs: 4 keys, A·T=T·A, G·C=C·G, all finite", () => {
+    const t = pairRelaxationTimesFs(310, 0.2);
+    expect(Object.keys(t).sort()).toEqual(["AT", "CG", "GC", "TA"]);
+    expect(t.AT).toBe(t.TA);
+    expect(t.GC).toBe(t.CG);
+    for (const v of Object.values(t)) {
+      expect(v).toBeGreaterThan(0);
+      expect(Number.isFinite(v)).toBe(true);
+    }
   });
 
   it("windowMean smooths and preserves length & mean", () => {

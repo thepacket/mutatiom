@@ -1,6 +1,23 @@
 import { useMemo, useState } from "react";
-import { analyzeSequence, windowMean, PAIR_PRESETS, pairFor, type Base } from "./sim/dna";
+import {
+  analyzeSequence,
+  windowMean,
+  pairRelaxationTimesFs,
+  PAIR_PRESETS,
+  pairFor,
+  type Base,
+} from "./sim/dna";
 import { fetchBySymbol } from "./sim/ensembl";
+
+type Metric = "susc" | "relax";
+
+function fmtTime(fs: number): string {
+  if (!Number.isFinite(fs)) return "∞";
+  if (fs < 1e3) return `${fs.toFixed(0)} fs`;
+  if (fs < 1e6) return `${(fs / 1e3).toFixed(1)} ps`;
+  if (fs < 1e9) return `${(fs / 1e6).toFixed(1)} ns`;
+  return `${(fs / 1e9).toFixed(1)} µs`;
+}
 
 const BASE_COLOR: Record<Base, string> = {
   A: "#f59e0b",
@@ -45,20 +62,33 @@ export function DnaPanel({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [source, setSource] = useState("CpG island (synthetic)");
+  const [metric, setMetric] = useState<Metric>("susc");
+  const [coupling, setCoupling] = useState(0.2);
 
   const analysis = useMemo(() => analyzeSequence(seq, tempK), [seq, tempK]);
-  const shown = Math.min(analysis.bases.length, MAX_SHOW);
-  const smooth = useMemo(
-    () => windowMean(analysis.susceptibility, 9),
-    [analysis.susceptibility],
+  const relaxTimes = useMemo(
+    () => pairRelaxationTimesFs(tempK, coupling),
+    [tempK, coupling],
   );
 
-  const maxS = Math.max(...analysis.susceptibility, 1e-12);
+  // Per-position value for the active metric.
+  const series = useMemo(
+    () =>
+      metric === "susc"
+        ? analysis.susceptibility
+        : analysis.pairs.map((p) => relaxTimes[p]),
+    [metric, analysis, relaxTimes],
+  );
+
+  const shown = Math.min(analysis.bases.length, MAX_SHOW);
+  const smooth = useMemo(() => windowMean(series, 9), [series]);
+
+  const maxS = Math.max(...series, 1e-12);
   const bw = shown ? (W - 2 * PAD) / shown : 0;
   const bx = (i: number) => PAD + i * bw;
   const by = (s: number) => H - PAD - (s / maxS) * (H - 2 * PAD);
 
-  const smoothPath = analysis.susceptibility
+  const smoothPath = series
     .slice(0, shown)
     .map((_, i) => `${i ? "L" : "M"}${(bx(i) + bw / 2).toFixed(1)},${by(smooth[i]).toFixed(1)}`)
     .join(" ");
@@ -91,8 +121,20 @@ export function DnaPanel({
   return (
     <section className="dna">
       <div className="dna-head">
-        <h2>DNA strand · tautomer susceptibility</h2>
+        <h2>
+          DNA strand ·{" "}
+          {metric === "susc" ? "tautomer susceptibility" : "relaxation time"}
+        </h2>
         <span className="src">{source}</span>
+        <span className="spacer" />
+        <div className="seg metric">
+          <button className={metric === "susc" ? "on" : ""} onClick={() => setMetric("susc")}>
+            Susceptibility
+          </button>
+          <button className={metric === "relax" ? "on" : ""} onClick={() => setMetric("relax")}>
+            Relaxation time
+          </button>
+        </div>
       </div>
 
       <div className="dna-controls">
@@ -121,6 +163,23 @@ export function DnaPanel({
         </button>
       </div>
 
+      {metric === "relax" && (
+        <div className="dna-coupling">
+          <span>System–bath coupling κ <b>{coupling.toFixed(2)}</b></span>
+          <input
+            type="range"
+            min={0.02}
+            max={1}
+            step={0.01}
+            value={coupling}
+            onChange={(e) => setCoupling(parseFloat(e.target.value))}
+          />
+          <span className="hint">
+            G·C relaxes in {fmtTime(relaxTimes.GC)} · A·T in {fmtTime(relaxTimes.AT)}
+          </span>
+        </div>
+      )}
+
       <textarea
         className="seqbox"
         value={seq}
@@ -143,9 +202,9 @@ export function DnaPanel({
             <rect
               key={i}
               x={bx(i)}
-              y={by(analysis.susceptibility[i])}
+              y={by(series[i])}
               width={Math.max(bw - 0.4, 0.6)}
-              height={H - PAD - by(analysis.susceptibility[i])}
+              height={H - PAD - by(series[i])}
               fill={BASE_COLOR[b]}
               opacity={isSel ? 1 : 0.78}
               stroke={isSel ? "#fff" : cpgSet.has(i) ? "#fde047" : "none"}
@@ -154,14 +213,16 @@ export function DnaPanel({
               style={{ cursor: "pointer" }}
             >
               <title>
-                {`#${i + 1} ${PAIR_PRESETS[pairFor(b)].label}  susceptibility ${analysis.susceptibility[i].toExponential(2)}`}
+                {`#${i + 1} ${PAIR_PRESETS[pairFor(b)].label}  ·  susceptibility ${analysis.susceptibility[i].toExponential(2)}  ·  relaxation ${fmtTime(relaxTimes[analysis.pairs[i]])}`}
               </title>
             </rect>
           );
         })}
         <path d={smoothPath} className="smooth" />
         <text x={PAD} y={18} className="ylbl">
-          tautomer fraction (↑ = more mutable) · yellow edge = CpG
+          {metric === "susc"
+            ? "tautomer fraction (↑ = more mutable) · yellow edge = CpG"
+            : "relaxation time (↑ = slower to equilibrate) · yellow edge = CpG"}
         </text>
       </svg>
 
@@ -175,7 +236,8 @@ export function DnaPanel({
             <b style={{ color: BASE_COLOR[selBase] }}>
               {PAIR_PRESETS[pairFor(selBase)].label}
             </b>{" "}
-            → double well below
+            · susc {analysis.susceptibility[selected ?? 0].toExponential(2)} · relax{" "}
+            {fmtTime(relaxTimes[pairFor(selBase)])} → double well below
           </span>
         )}
       </div>
