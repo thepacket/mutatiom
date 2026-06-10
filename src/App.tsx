@@ -9,6 +9,7 @@ import { prepareLeftLocalised, densityAt } from "./sim/evolve";
 import { PAIR_PRESETS, pairFor, type Base } from "./sim/dna";
 import { DnaPanel } from "./DnaPanel";
 import { LindbladPanel } from "./LindbladPanel";
+import { IsotopePanel } from "./IsotopePanel";
 import {
   PROTON_MASS,
   DEUTERON_MASS,
@@ -227,6 +228,8 @@ export function App() {
       </div>
 
       <LindbladPanel solved={solved} tempK={tempK} />
+
+      <IsotopePanel params={params} />
     </div>
   );
 }

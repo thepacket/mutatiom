@@ -135,8 +135,34 @@ header .tag { margin: 0 0 22px; color: var(--muted); max-width: 720px; line-heig
 .lind-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .lind-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 0; }
 
+.iso {
+  background: var(--panel); border: 1px solid #21304f; border-radius: 14px;
+  padding: 16px 18px; margin-top: 22px;
+}
+.iso-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.iso-head h2 { margin: 0; font-size: 16px; font-weight: 650; }
+.iso-head .src { color: var(--muted); font-size: 12px; }
+.iso-body { display: grid; grid-template-columns: 1fr 230px; gap: 20px; align-items: start; }
+.isoplot { width: 100%; background: var(--bg); border: 1px solid #1c2742; border-radius: 10px; }
+.isoplot .grid { stroke: #1c2742; stroke-width: 1; }
+.isoplot .xtick { fill: var(--muted); font-size: 10.5px; text-anchor: middle; }
+.isoplot .isolbl { fill: var(--ink); font-size: 14px; font-weight: 700; text-anchor: end; }
+.isoplot .kielbl { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.isoplot .classmark { stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 3 2; }
+.isoplot .classlbl { fill: #94a3b8; font-size: 10px; text-anchor: middle; }
+.isoplot .axislbl { fill: var(--muted); font-size: 11px; }
+
+.iso-side { display: flex; flex-direction: column; gap: 10px; }
+.iso-stat { background: var(--panel2); border: 1px solid #2a3a5f; border-radius: 10px; padding: 9px 11px; }
+.iso-stat-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.iso-stat-name span { font-weight: 400; color: var(--muted); font-size: 11px; }
+.iso-stat-row { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
+.iso-stat-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.iso-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 4px 0 0; }
+
 @media (max-width: 880px) {
   .main { grid-template-columns: 1fr; }
   .readout { grid-template-columns: repeat(2, 1fr); }
   .lind-body { grid-template-columns: 1fr; }
+  .iso-body { grid-template-columns: 1fr; }
 }
