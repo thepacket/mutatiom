@@ -176,9 +176,49 @@ header .tag { margin: 0 0 22px; color: var(--muted); max-width: 720px; line-heig
 .iso-stat-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .iso-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 4px 0 0; }
 
+.dw2 {
+  background: var(--panel); border: 1px solid #21304f; border-radius: 14px;
+  padding: 16px 18px; margin-top: 22px;
+}
+.dw2-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.dw2-head h2 { margin: 0; font-size: 16px; font-weight: 650; }
+.dw2-head .src { color: var(--muted); font-size: 12px; }
+.dw2-body { display: grid; grid-template-columns: 360px 1fr; gap: 22px; align-items: start; }
+.dw2-stage { position: relative; width: 360px; height: 360px; }
+.dw2-canvas {
+  width: 360px; height: 360px; border-radius: 10px; border: 1px solid #1c2742;
+  image-rendering: auto;
+}
+.dw2-overlay { position: absolute; inset: 0; width: 360px; height: 360px; pointer-events: none; }
+.dw2-overlay .path { fill: none; stroke-width: 1.2; opacity: 0.5; }
+.dw2-overlay .path.step { stroke: #f8fafc; }
+.dw2-overlay .path.conc { stroke: #f8fafc; stroke-dasharray: 3 2; }
+.dw2-overlay .path.win { opacity: 1; stroke-width: 2; }
+.dw2-overlay .corner { fill: #e8edf7; font-size: 4px; text-anchor: middle; paint-order: stroke; stroke: #0b0f1a; stroke-width: 0.8; }
+.dw2-overlay .corner.taut { fill: #f472b6; }
+.dw2-overlay .corner.spt { fill: #94a3b8; }
+.dw2-axes .ax-x { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--muted); }
+.dw2-axes .ax-y { position: absolute; left: -22px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 11px; color: var(--muted); }
+
+.dw2-side { display: flex; flex-direction: column; gap: 12px; }
+.dw2-mech { font-size: 13px; color: var(--muted); }
+.dw2-mech b { font-size: 14px; }
+.dw2-mech b.concerted { color: #a3e635; }
+.dw2-mech b.stepwise { color: #fbbf24; }
+.dw2-bars { display: flex; flex-direction: column; gap: 7px; }
+.dw2-bar { display: grid; grid-template-columns: 130px 1fr 38px; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.dw2-bar-track { background: var(--panel2); border-radius: 5px; height: 12px; overflow: hidden; }
+.dw2-bar-fill { height: 100%; background: #475569; border-radius: 5px; }
+.dw2-bar-fill.win { background: var(--accent); }
+.dw2-bar-val { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+.dw2-pops { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.dw2-pops b { color: var(--ink); }
+.dw2-note { font-size: 11px; color: #6b7799; line-height: 1.5; margin: 4px 0 0; }
+
 @media (max-width: 880px) {
   .main { grid-template-columns: 1fr; }
   .readout { grid-template-columns: repeat(2, 1fr); }
   .lind-body { grid-template-columns: 1fr; }
   .iso-body { grid-template-columns: 1fr; }
+  .dw2-body { grid-template-columns: 1fr; }
 }

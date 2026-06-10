@@ -10,6 +10,7 @@ import { PAIR_PRESETS, pairFor, type Base } from "./sim/dna";
 import { DnaPanel } from "./DnaPanel";
 import { LindbladPanel } from "./LindbladPanel";
 import { IsotopePanel } from "./IsotopePanel";
+import { DoubleWell2DPanel } from "./DoubleWell2DPanel";
 import {
   PROTON_MASS,
   DEUTERON_MASS,
@@ -230,6 +231,8 @@ export function App() {
       <LindbladPanel solved={solved} tempK={tempK} />
 
       <IsotopePanel params={params} />
+
+      <DoubleWell2DPanel />
     </div>
   );
 }
