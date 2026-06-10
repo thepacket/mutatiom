@@ -101,15 +101,34 @@ export function thermalPopulations(E: number[], kT: number): number[] {
 }
 
 /**
- * Relaxation time of the lowest (canonical↔tautomer) pair, 1/(r₀₁+r₁₀), in
- * femtoseconds — without time-stepping. This is the timescale on which the
- * open system reaches its thermal tautomer population.
+ * Identify the canonical and tautomer eigenstates by well localisation: the
+ * canonical state is the most left-localised (smallest right-well weight), the
+ * tautomer state the most right-localised. For a biased/deep well the tautomer
+ * is NOT necessarily state 1 — an intra-well vibrational excitation can sit
+ * lower — so we can't assume the {0,1} pair.
+ */
+export function wellStateIndices(sys: LindbladSystem): { canon: number; taut: number } {
+  let canon = 0;
+  let taut = 0;
+  for (let a = 0; a < sys.M; a++) {
+    if (sys.projRight[a][a] < sys.projRight[canon][canon]) canon = a;
+    if (sys.projRight[a][a] > sys.projRight[taut][taut]) taut = a;
+  }
+  return { canon, taut };
+}
+
+/**
+ * Canonical↔tautomer relaxation time 1/(r_{c→t}+r_{t→c}) in femtoseconds,
+ * without time-stepping — the timescale on which the open system reaches its
+ * thermal tautomer population.
  */
 export function relaxationTimeFs(res: SolveResult, tempK: number, coupling: number): number {
   const sys = buildSystem(res, 4);
   const kT = BOLTZMANN_HARTREE_PER_K * tempK;
   const rates = buildRates(sys, kT, coupling);
-  const R = (rates[0]?.[1] ?? 0) + (rates[1]?.[0] ?? 0);
+  const { canon, taut } = wellStateIndices(sys);
+  if (canon === taut) return Infinity;
+  const R = rates[canon][taut] + rates[taut][canon];
   return R > 0 ? (1 / R) * ATOMIC_TIME_TO_SECONDS * 1e15 : Infinity;
 }
 
@@ -191,9 +210,10 @@ export function evolveLindblad(res: SolveResult, opts: LindbladOptions): Lindbla
   const kT = BOLTZMANN_HARTREE_PER_K * opts.tempK;
   const rates = buildRates(sys, kT, opts.coupling);
 
-  // Lowest-pair relaxation rate sets the natural timescale.
-  const R01 = (rates[0]?.[1] ?? 0) + (rates[1]?.[0] ?? 0);
-  const relaxTimeAtomic = R01 > 0 ? 1 / R01 : Infinity;
+  // Canonical↔tautomer rate sets the natural timescale (not necessarily {0,1}).
+  const { canon, taut } = wellStateIndices(sys);
+  const Rct = canon === taut ? 0 : rates[canon][taut] + rates[taut][canon];
+  const relaxTimeAtomic = Rct > 0 ? 1 / Rct : Infinity;
   const tMaxAtomic = opts.tMaxFs
     ? opts.tMaxFs / (ATOMIC_TIME_TO_SECONDS * 1e15)
     : Number.isFinite(relaxTimeAtomic)

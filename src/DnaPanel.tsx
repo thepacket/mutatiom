@@ -8,6 +8,7 @@ import {
   type Base,
 } from "./sim/dna";
 import { fetchBySymbol } from "./sim/ensembl";
+import { GC_DATA, AT_DATA } from "./sim/basePairData";
 
 type Metric = "susc" | "relax";
 
@@ -83,10 +84,18 @@ export function DnaPanel({
   const shown = Math.min(analysis.bases.length, MAX_SHOW);
   const smooth = useMemo(() => windowMean(series, 9), [series]);
 
-  const maxS = Math.max(...series, 1e-12);
+  // Susceptibility spans many decades (G·C ~10⁻⁸ vs A·T ~10⁻¹⁰), so it is
+  // shown on a log scale over a 4-decade window; relaxation time (within ~20×)
+  // stays linear.
+  const maxS = Math.max(...series, 1e-300);
+  const logFloor = Math.log10(maxS) - 4;
+  const frac = (s: number) =>
+    metric === "susc"
+      ? Math.max(0, Math.min(1, (Math.log10(Math.max(s, 1e-300)) - logFloor) / 4))
+      : Math.max(0, Math.min(1, s / maxS));
   const bw = shown ? (W - 2 * PAD) / shown : 0;
   const bx = (i: number) => PAD + i * bw;
-  const by = (s: number) => H - PAD - (s / maxS) * (H - 2 * PAD);
+  const by = (s: number) => H - PAD - frac(s) * (H - 2 * PAD);
 
   const smoothPath = series
     .slice(0, shown)
@@ -221,7 +230,7 @@ export function DnaPanel({
         <path d={smoothPath} className="smooth" />
         <text x={PAD} y={18} className="ylbl">
           {metric === "susc"
-            ? "tautomer fraction (↑ = more mutable) · yellow edge = CpG"
+            ? "tautomer fraction — log scale, 4 decades (↑ = more mutable) · yellow edge = CpG"
             : "relaxation time (↑ = slower to equilibrate) · yellow edge = CpG"}
         </text>
       </svg>
@@ -241,6 +250,19 @@ export function DnaPanel({
           </span>
         )}
       </div>
+
+      <p className="dna-cite">
+        Double-well parameters from published quantum-chemistry studies:{" "}
+        G·C —{" "}
+        <a href={`https://doi.org/${GC_DATA.doi}`} target="_blank" rel="noreferrer">
+          {GC_DATA.citation}
+        </a>{" "}
+        · A·T —{" "}
+        <a href={`https://doi.org/${AT_DATA.doi}`} target="_blank" rel="noreferrer">
+          {AT_DATA.citation}
+        </a>
+        . Well separation is an effective H-bond geometry estimate (see README).
+      </p>
     </section>
   );
 }

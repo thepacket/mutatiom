@@ -56,6 +56,8 @@ describe("DNA layer", () => {
       expect(v).toBeGreaterThan(0);
       expect(Number.isFinite(v)).toBe(true);
     }
+    // A·T (higher barrier) relaxes slower than G·C.
+    expect(t.AT).toBeGreaterThan(t.GC);
   });
 
   it("windowMean smooths and preserves length & mean", () => {

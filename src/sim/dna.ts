@@ -7,17 +7,17 @@
 // asymmetry / well-studied double proton transfer), so a GC-rich stretch is
 // intrinsically more mutable under this mechanism.
 //
-// Per base pair we attach a representative double-well preset and read off its
-// thermal tautomer fraction as a *susceptibility* score. The presets are
-// physically motivated but illustrative (atomic units, see constants.ts), not
-// fitted to a specific ab-initio surface — they preserve the GC > AT ordering
-// and respond to temperature, which is the legible physics this tool is for.
+// Per base pair we attach a double-well preset (derived from published
+// quantum-chemistry barriers/asymmetries — see basePairData.ts for the citation
+// trail) and read off its thermal tautomer fraction as a *susceptibility*
+// score. The values are grounded in the literature, not hand-tuned; the well
+// separation is the one effective geometric parameter (see basePairData CAVEAT).
 
 import type { ProtonParams } from "./doubleWell";
 import { solveDoubleWell } from "./doubleWell";
-import { PROTON_MASS } from "./constants";
 import { tautomerFraction } from "./tunneling";
 import { relaxationTimeFs } from "./lindblad";
+import { GC_DATA, AT_DATA, deriveParams } from "./basePairData";
 
 export type Base = "A" | "C" | "G" | "T";
 export type PairType = "AT" | "TA" | "GC" | "CG";
@@ -35,25 +35,12 @@ export interface PairPreset {
   params: ProtonParams;
 }
 
-// A·T (two H-bonds) is held more rigidly / more asymmetric → rarer tautomer.
-// G·C (three H-bonds) → lower asymmetry, more tautomer-prone.
-const AT_PARAMS: ProtonParams = {
-  mass: PROTON_MASS,
-  barrier: 0.016,
-  wellSep: 0.7,
-  bias: 0.007,
-  halfWidth: 1.8,
-  gridN: 401,
-};
-
-const GC_PARAMS: ProtonParams = {
-  mass: PROTON_MASS,
-  barrier: 0.012,
-  wellSep: 0.7,
-  bias: 0.004,
-  halfWidth: 1.8,
-  gridN: 401,
-};
+// Derived from published barriers/asymmetries (basePairData.ts). G·C has the
+// lower asymmetry (≈0.435 eV) and barrier, so it is the more tautomer-prone
+// pair; A·T (≈0.572 eV asymmetry, ~1 eV barrier) is far rarer — matching the
+// known mutational bias.
+const GC_PARAMS: ProtonParams = deriveParams(GC_DATA);
+const AT_PARAMS: ProtonParams = deriveParams(AT_DATA);
 
 export const PAIR_PRESETS: Record<PairType, PairPreset> = {
   AT: { hbonds: 2, label: "A=T", params: AT_PARAMS },

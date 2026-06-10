@@ -36,11 +36,43 @@ npm run typecheck
 npm run build
 ```
 
+## Data provenance
+
+The A·T and G·C base-pair double wells are **derived from published
+quantum-chemistry studies**, not hand-tuned. Both source studies model the
+transfer as a 1-D asymmetric *quartic* double well — the same form Mutatiom
+uses — so the mapping is direct (`src/sim/basePairData.ts`).
+
+| Pair | Forward barrier | Asymmetry ΔE | Source |
+|------|-----------------|--------------|--------|
+| G·C  | 0.704 eV (E₀ = 0.049 eV) | 0.435 eV | Slocombe, Sacchi & Al-Khalili, *Commun. Phys.* **5**, 109 (2022) — [10.1038/s42005-022-00881-8](https://doi.org/10.1038/s42005-022-00881-8) |
+| A·T  | 1.00 eV | 0.572 eV | Godbeer, Al-Khalili & Stevenson, *Phys. Chem. Chem. Phys.* **17**, 13034 (2015) — [10.1039/c5cp00472a](https://doi.org/10.1039/c5cp00472a) |
+
+Mapping to the model `V(x) = V₀(x²/a²−1)² + (bias/2)(x/a)`: the minima sit at
+x ≈ ∓a with V(∓a) ≈ ∓bias/2, so **bias = ΔE** and **V₀ = E_f − ΔE/2**. With
+these values the G·C tautomer fraction at 310 K comes out ~10⁻⁷ (literature
+range) and G·C is ~170× more tautomer-prone than A·T — the known mutational
+bias, reproduced rather than imposed.
+
+**One caveat:** neither paper states the length scale *a* (half the minima
+separation) numerically. We use *a* = 0.30 Å (transfer distance 2a ≈ 0.6 Å),
+the standard proton-transfer geometry of a Watson–Crick N–H···N / N–H···O
+hydrogen bond. It sets the barrier *width*; it is the one parameter not pinned
+by the two studies.
+
+The generic editor double well (the "custom parameters" default, before a base
+pair is selected) remains a freely tunable illustrative model — not a specific
+base pair.
+
 ## Physics notes
 
 - Atomic units throughout (ħ = mₑ = e = 1); length in Bohr, energy in Hartree.
 - The finite-difference splitting is only meaningful while it sits above the
   numerical floor (θ ≲ a few). For a *realistic* DNA barrier the isolated
   coherent splitting is astronomically small — which is exactly why thermally
-  assisted / open-quantum-system rates dominate the biology. A Lindblad
-  open-system engine is the planned second simulator.
+  assisted / open-quantum-system rates dominate the biology, captured by the
+  Lindblad engine (`src/sim/lindblad.ts`).
+- For a biased/deep well the two lowest eigenstates are not necessarily the
+  canonical/tautomer pair (an intra-well vibrational state can sit lower), so
+  the relaxation time identifies the canonical and tautomer states by their
+  well localisation rather than assuming the {0,1} pair.
