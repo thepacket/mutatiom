@@ -76,3 +76,13 @@ base pair.
   canonical/tautomer pair (an intra-well vibrational state can sit lower), so
   the relaxation time identifies the canonical and tautomer states by their
   well localisation rather than assuming the {0,1} pair.
+- **Bath model.** The Lindblad rates come from a named spectral density
+  (`src/sim/spectralDensity.ts`): an Ohmic-with-cutoff or Drude–Lorentz bath
+  parameterised by a reorganization energy λ and a cutoff frequency ω_c, in the
+  Caldeira–Leggett framework the DNA literature uses (Slocombe et al. 2022;
+  Godbeer et al. 2015 model the environment as an Ohmic harmonic bath). The
+  *strength* (λ) is a phenomenological estimate — as it is in those works — not
+  derived from first principles; it is user-adjustable. Detailed balance is
+  built into the weights, so the steady state is the Gibbs state. At the default
+  λ ≈ 0.3 eV the canonical↔tautomer interconversion is sub-nanosecond
+  (G·C ~0.5 ps, A·T ~30 ps), consistent with the literature.

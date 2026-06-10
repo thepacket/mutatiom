@@ -9,6 +9,7 @@ import {
 } from "./sim/dna";
 import { fetchBySymbol } from "./sim/ensembl";
 import { GC_DATA, AT_DATA } from "./sim/basePairData";
+import { bathWithReorg } from "./sim/spectralDensity";
 
 type Metric = "susc" | "relax";
 
@@ -64,12 +65,12 @@ export function DnaPanel({
   const [err, setErr] = useState<string | null>(null);
   const [source, setSource] = useState("CpG island (synthetic)");
   const [metric, setMetric] = useState<Metric>("susc");
-  const [coupling, setCoupling] = useState(0.2);
+  const [lambdaEv, setLambdaEv] = useState(0.3);
 
   const analysis = useMemo(() => analyzeSequence(seq, tempK), [seq, tempK]);
   const relaxTimes = useMemo(
-    () => pairRelaxationTimesFs(tempK, coupling),
-    [tempK, coupling],
+    () => pairRelaxationTimesFs(tempK, bathWithReorg(lambdaEv)),
+    [tempK, lambdaEv],
   );
 
   // Per-position value for the active metric.
@@ -174,14 +175,14 @@ export function DnaPanel({
 
       {metric === "relax" && (
         <div className="dna-coupling">
-          <span>System–bath coupling κ <b>{coupling.toFixed(2)}</b></span>
+          <span>Bath reorganization energy λ <b>{(lambdaEv * 1000).toFixed(0)} meV</b></span>
           <input
             type="range"
             min={0.02}
             max={1}
             step={0.01}
-            value={coupling}
-            onChange={(e) => setCoupling(parseFloat(e.target.value))}
+            value={lambdaEv}
+            onChange={(e) => setLambdaEv(parseFloat(e.target.value))}
           />
           <span className="hint">
             G·C relaxes in {fmtTime(relaxTimes.GC)} · A·T in {fmtTime(relaxTimes.AT)}

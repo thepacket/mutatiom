@@ -18,6 +18,7 @@ import { solveDoubleWell } from "./doubleWell";
 import { tautomerFraction } from "./tunneling";
 import { relaxationTimeFs } from "./lindblad";
 import { GC_DATA, AT_DATA, deriveParams } from "./basePairData";
+import type { SpectralDensity } from "./spectralDensity";
 
 export type Base = "A" | "C" | "G" | "T";
 export type PairType = "AT" | "TA" | "GC" | "CG";
@@ -108,10 +109,10 @@ export function analyzeSequence(raw: string, tempK: number): SequenceAnalysis {
  */
 export function pairRelaxationTimesFs(
   tempK: number,
-  coupling: number,
+  bath: SpectralDensity,
 ): Record<PairType, number> {
-  const gc = relaxationTimeFs(solveDoubleWell(GC_PARAMS), tempK, coupling);
-  const at = relaxationTimeFs(solveDoubleWell(AT_PARAMS), tempK, coupling);
+  const gc = relaxationTimeFs(solveDoubleWell(GC_PARAMS), tempK, bath);
+  const at = relaxationTimeFs(solveDoubleWell(AT_PARAMS), tempK, bath);
   return { GC: gc, CG: gc, AT: at, TA: at };
 }
 

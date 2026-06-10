@@ -20,12 +20,15 @@
 import { BOLTZMANN_HARTREE_PER_K, ATOMIC_TIME_TO_SECONDS } from "./constants";
 import type { SolveResult } from "./doubleWell";
 import { prepareLeftLocalised } from "./evolve";
+import { rateWeight, type SpectralDensity } from "./spectralDensity";
 
 export interface LindbladSystem {
   M: number;
   E: number[]; // truncated eigen-energies
   /** Position matrix elements x_{mn} = ⟨m|x|n⟩ (real, symmetric). */
   xpos: number[][];
+  /** Reduced position matrix u_{mn} = x_{mn}/a (dimensionless coupling operator). */
+  upos: number[][];
   /** Right-well projector ⟨m|Π_{x>0}|n⟩ (real, symmetric). */
   projRight: number[][];
   /** Initial left-localised coefficients c_n (real). */
@@ -55,33 +58,32 @@ export function buildSystem(res: SolveResult, M = 6): LindbladSystem {
     }
   }
 
+  // Reduced (dimensionless) coupling operator u = x/a — keeps the rates
+  // dimensionally clean against the energy-valued spectral density.
+  const a = res.params.wellSep || 1;
+  const upos = xpos.map((row) => row.map((v) => v / a));
+
   // Renormalise the left-localised state within the truncated subspace so the
   // initial density matrix has unit trace (dropped high-state weight aside).
   const wp = prepareLeftLocalised(res, m);
   const c0 = wp.cRe.slice(0, m);
   const norm = Math.sqrt(c0.reduce((s, v) => s + v * v, 0)) || 1;
   for (let i = 0; i < m; i++) c0[i] /= norm;
-  return { M: m, E, xpos, projRight, c0 };
+  return { M: m, E, xpos, upos, projRight, c0 };
 }
 
-/** Bath weight for a system energy change dE, obeying detailed balance. */
-export function bathWeight(dE: number, kT: number): number {
-  // Ohmic spectral density J(ω) = ω; emission ∝ (n+1), absorption ∝ n.
-  if (kT <= 0) return dE < 0 ? -dE : 0; // T = 0: only spontaneous emission
-  const a = Math.abs(dE);
-  if (a < 1e-12) return kT; // ω→0 limit of ω·n(ω) = kT
-  const n = 1 / (Math.exp(a / kT) - 1);
-  return dE < 0 ? a * (n + 1) : a * n;
-}
-
-/** All incoherent transition rates r_{ij} (i→j), as a dense M×M matrix. */
-export function buildRates(sys: LindbladSystem, kT: number, coupling: number): number[][] {
-  const { M, E, xpos } = sys;
+/**
+ * All incoherent transition rates r_{ij} (i→j) from a physical bath spectral
+ * density: r_{ij} = |u_{ij}|²·weight(E_j−E_i), with u the reduced coordinate
+ * and weight obeying detailed balance (spectralDensity.ts).
+ */
+export function buildRates(sys: LindbladSystem, kT: number, sd: SpectralDensity): number[][] {
+  const { M, E, upos } = sys;
   const r = Array.from({ length: M }, () => new Array<number>(M).fill(0));
   for (let i = 0; i < M; i++) {
     for (let j = 0; j < M; j++) {
       if (i === j) continue;
-      r[i][j] = coupling * xpos[i][j] * xpos[i][j] * bathWeight(E[j] - E[i], kT);
+      r[i][j] = upos[i][j] * upos[i][j] * rateWeight(sd, E[j] - E[i], kT);
     }
   }
   return r;
@@ -122,10 +124,10 @@ export function wellStateIndices(sys: LindbladSystem): { canon: number; taut: nu
  * without time-stepping — the timescale on which the open system reaches its
  * thermal tautomer population.
  */
-export function relaxationTimeFs(res: SolveResult, tempK: number, coupling: number): number {
+export function relaxationTimeFs(res: SolveResult, tempK: number, sd: SpectralDensity): number {
   const sys = buildSystem(res, 4);
   const kT = BOLTZMANN_HARTREE_PER_K * tempK;
-  const rates = buildRates(sys, kT, coupling);
+  const rates = buildRates(sys, kT, sd);
   const { canon, taut } = wellStateIndices(sys);
   if (canon === taut) return Infinity;
   const R = rates[canon][taut] + rates[taut][canon];
@@ -192,7 +194,7 @@ export interface LindbladTrajectory {
 export interface LindbladOptions {
   M?: number;
   tempK: number;
-  coupling: number;
+  bath: SpectralDensity;
   tMaxFs?: number;
   samples?: number;
 }
@@ -208,7 +210,7 @@ export function evolveLindblad(res: SolveResult, opts: LindbladOptions): Lindbla
   const sys = buildSystem(res, opts.M ?? 4);
   const { M, E, c0, projRight } = sys;
   const kT = BOLTZMANN_HARTREE_PER_K * opts.tempK;
-  const rates = buildRates(sys, kT, opts.coupling);
+  const rates = buildRates(sys, kT, opts.bath);
 
   // Canonical↔tautomer rate sets the natural timescale (not necessarily {0,1}).
   const { canon, taut } = wellStateIndices(sys);

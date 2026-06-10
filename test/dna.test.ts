@@ -8,6 +8,7 @@ import {
   pairRelaxationTimesFs,
   COMPLEMENT,
 } from "../src/sim/dna";
+import { bathWithReorg } from "../src/sim/spectralDensity";
 
 describe("DNA layer", () => {
   it("parses and sanitises a sequence (FASTA-ish input)", () => {
@@ -48,7 +49,7 @@ describe("DNA layer", () => {
   });
 
   it("pairRelaxationTimesFs: 4 keys, A·T=T·A, G·C=C·G, all finite", () => {
-    const t = pairRelaxationTimesFs(310, 0.2);
+    const t = pairRelaxationTimesFs(310, bathWithReorg(0.3));
     expect(Object.keys(t).sort()).toEqual(["AT", "CG", "GC", "TA"]);
     expect(t.AT).toBe(t.TA);
     expect(t.GC).toBe(t.CG);

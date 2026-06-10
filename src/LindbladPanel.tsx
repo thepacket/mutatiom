@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { SolveResult } from "./sim/doubleWell";
 import { evolveLindblad } from "./sim/lindblad";
+import { bathWithReorg } from "./sim/spectralDensity";
 
 const W = 760;
 const H = 280;
@@ -15,11 +16,11 @@ function fmtTime(fs: number): string {
 }
 
 export function LindbladPanel({ solved, tempK }: { solved: SolveResult; tempK: number }) {
-  const [coupling, setCoupling] = useState(0.2);
+  const [lambdaEv, setLambdaEv] = useState(0.3);
 
   const traj = useMemo(
-    () => evolveLindblad(solved, { tempK, coupling, samples: 200 }),
-    [solved, tempK, coupling],
+    () => evolveLindblad(solved, { tempK, bath: bathWithReorg(lambdaEv), samples: 200 }),
+    [solved, tempK, lambdaEv],
   );
 
   const tMax = traj.timesFs[traj.timesFs.length - 1] || 1;
@@ -75,16 +76,17 @@ export function LindbladPanel({ solved, tempK }: { solved: SolveResult; tempK: n
         <div className="lind-side">
           <label className="field">
             <span>
-              System–bath coupling κ <b>{coupling.toFixed(3)}</b>
+              Bath reorganization energy λ <b>{(lambdaEv * 1000).toFixed(0)} meV</b>
             </span>
             <input
               type="range"
               min={0.02}
               max={1}
               step={0.01}
-              value={coupling}
-              onChange={(e) => setCoupling(parseFloat(e.target.value))}
+              value={lambdaEv}
+              onChange={(e) => setLambdaEv(parseFloat(e.target.value))}
             />
+            <span className="sub">Ohmic Caldeira–Leggett bath (phenomenological strength)</span>
           </label>
 
           <div className="legend">
