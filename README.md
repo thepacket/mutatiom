@@ -9,22 +9,48 @@ amplitude for that proton to **tunnel** to the second minimum, flipping the
 base into its rare **tautomeric** form. If that happens during replication,
 the polymerase mispairs it — a spontaneous point mutation. Mutatiom makes the
 physics legible: solve the proton's Schrödinger equation, watch the wavepacket
-tunnel between the canonical and tautomer wells, and read off the tunnelling
-splitting, transfer time, barrier action, and thermal tautomer fraction.
+tunnel between the canonical and tautomer wells, map mutation susceptibility
+along a real gene, and compare the coherent and dissipative pictures.
 
 Everything runs in the browser. No install, no account, no backend.
+
+> **Scope:** an educational / reduced-model tool grounded in published quantum
+> chemistry — not a from-first-principles mutation-rate predictor. See
+> [docs/METHODS.md](docs/METHODS.md).
+
+## Features
+
+- **Proton double well** — interactive 1-D Schrödinger solver with live
+  |Ψ(x,t)|² tunnelling animation; splitting, transfer time, WKB action, tautomer
+  fraction; proton/deuteron toggle.
+- **DNA strand** — paste a sequence, pick an example, or fetch a real human gene
+  from Ensembl; a clickable per-base track of tautomer susceptibility *or*
+  open-system relaxation time; selecting a base loads its base-pair double well.
+- **Open-system relaxation (Lindblad)** — the proton coupled to a thermal bath
+  decoheres and relaxes to the Gibbs tautomer population.
+- **Kinetic isotope effect** — ¹H/²H/³H slowdown vs the classical limit.
+- **2-D double proton transfer** — concerted vs stepwise mechanism on the
+  two-proton potential surface.
 
 ## Stack
 
 - Vite + React + TypeScript, client-only (the same philosophy as Quantiom).
 - `src/sim/` — the physics core:
   - `eigen.ts` — symmetric-tridiagonal eigensolver (QL with implicit shifts).
-  - `doubleWell.ts` — quartic double-well model + finite-difference Schrödinger solver.
-  - `tunneling.ts` — ground splitting Δ, WKB barrier action, transfer time, tautomer fraction.
+  - `doubleWell.ts` — quartic double-well + finite-difference Schrödinger solver.
+  - `doubleWell2d.ts` — 2-D coupled double-proton-transfer + imaginary-time ground state.
+  - `tunneling.ts` — splitting Δ, WKB barrier action, transfer time, tautomer fraction.
   - `evolve.ts` — coherent wavepacket evolution of a well-localised proton.
+  - `lindblad.ts` — open-system master equation (detailed-balance jump operators).
+  - `spectralDensity.ts` — Ohmic / Drude–Lorentz bath (Caldeira–Leggett).
+  - `isotopes.ts` — kinetic isotope effect across ¹H/²H/³H.
+  - `dna.ts` — sequence → base-pair presets, susceptibility, relaxation, CpG sites.
+  - `basePairData.ts` — literature-sourced A·T / G·C parameters + provenance.
+  - `ensembl.ts` — fetch real coding sequences from the Ensembl REST API.
   - `constants.ts` — atomic units and display conversions.
-- `src/App.tsx` — interactive double-well visualizer (potential, eigenstates,
-  live |Ψ(x,t)|², tunnelling readouts).
+- Panels: `App.tsx` (double well), `DnaPanel`, `LindbladPanel`, `IsotopePanel`,
+  `DoubleWell2DPanel`.
+- `server/` — minimal FastAPI static host (`/api/health`) for the Fly deployment.
 
 ## Develop
 
