@@ -34,15 +34,36 @@ export async function fetchById(id: string): Promise<FetchedSequence> {
   return { id: data.id ?? id, sequence: data.seq, source: `Ensembl CDS · ${id}` };
 }
 
-/** Look up a gene by species + symbol, then fetch its CDS. */
+interface LookupTranscript {
+  id: string;
+  is_canonical?: number;
+  biotype?: string;
+}
+
+/**
+ * Look up a gene by species + symbol, then fetch the CDS of its *canonical*
+ * transcript. (Fetching a gene-level CDS fails on Ensembl — a gene has many
+ * transcripts, e.g. TP53 has ~37 CDS — so we disambiguate to one transcript.)
+ */
 export async function fetchBySymbol(
   species: string,
   symbol: string,
 ): Promise<FetchedSequence> {
   const lookup = (await getJSON(
-    `/lookup/symbol/${encodeURIComponent(species)}/${encodeURIComponent(symbol)}`,
-  )) as { id?: string };
+    `/lookup/symbol/${encodeURIComponent(species)}/${encodeURIComponent(symbol)}?expand=1`,
+  )) as { id?: string; Transcript?: LookupTranscript[] };
   if (!lookup.id) throw new Error(`Gene "${symbol}" not found in ${species}`);
-  const seq = await fetchById(lookup.id);
-  return { ...seq, source: `Ensembl CDS · ${symbol} (${species}) · ${lookup.id}` };
+
+  const transcripts = lookup.Transcript ?? [];
+  const chosen =
+    transcripts.find((t) => t.is_canonical === 1) ??
+    transcripts.find((t) => t.biotype === "protein_coding") ??
+    transcripts[0];
+  if (!chosen?.id) throw new Error(`No transcript found for "${symbol}" in ${species}`);
+
+  const seq = await fetchById(chosen.id);
+  return {
+    ...seq,
+    source: `Ensembl CDS · ${symbol} (${species}) · ${chosen.id}`,
+  };
 }
