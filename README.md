@@ -52,6 +52,12 @@ Everything runs in the browser. No install, no account, no backend.
   `DoubleWell2DPanel`.
 - `server/` — minimal FastAPI static host (`/api/health`) for the Fly deployment.
 
+## Deploy (Fly.io)
+Single Fly app quantiom — the server hosts the built client.
+
+fly apps create quantiom        # one-time
+fly deploy
+
 ## Develop
 
 ```sh
