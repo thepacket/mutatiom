@@ -1,5 +1,7 @@
 # Mutatiom
 
+Note: Still in development.
+
 **Browser-native simulator and visualizer for quantum proton tunnelling in
 DNA base pairs** — the Löwdin mechanism of spontaneous point mutations.
 
